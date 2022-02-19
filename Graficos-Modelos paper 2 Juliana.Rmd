@@ -1,0 +1,790 @@
+---
+title: "Gráficos paper 2"
+author: "Juliana Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      smooth_scroll: false
+      collapsed: false
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center")
+```
+
+# Bibliotecas
+
+```{r}
+library(tidyverse) # manejo y visualización de datos
+library(janitor) # edición de nombres
+library(readxl) # lectura de datos en excel
+library(FactoMineR) # análisis multivariado
+library(factoextra) # funciones extras para análisis multivariado
+library(explor) # app shiny para ver resultados análisis multivariado
+library(DT) # Imprimir tablas interactivas
+library(corrplot) # correlograma
+library(splines) # Agregar no linealidad a dispersiones
+library(mgcv) # Modelos GAM
+library(tidymodels) # Modelo con Random Forest
+library(vip) # Importancia de variables
+library(itsadug) # Gráficos de contorno modelos GAM
+
+# Personalizano tema de ggplot2
+theme_set(theme_minimal())
+```
+
+
+# Índice positivo {.tabset .tabset-fade .tabset-pills}
+
+
+```{r, fig.height=4, width=3}
+df_indices <- read_excel("datos_indices_acp_paper2.xlsx") %>% 
+  rename(Positive_index = comp1)
+modelo17 <- gam(Positive_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2),
+                data = df_indices)
+
+fvisgam(modelo17, view = c("bpm", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumentation", xlab = "BPM",
+        hide.label = TRUE)
+
+# Exportando gráfico pdf
+dev.copy(tiff, 'graphics_paper2/Gam1.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+
+dev.off()
+
+```
+
+# Índice negativo {.tabset .tabset-fade .tabset-pills}
+
+
+
+```{r}
+df_indices <- df_indices %>% 
+  rename(Negative_index = comp2)
+modelo30 <- gam(Negative_index ~ ns(bpm, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+
+fvisgam(modelo30, view = c("bpm", "hfc"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "HFC", xlab = "BPM",
+        hide.label = TRUE)
+```
+
+```{r}
+fvisgam(modelo30, view = c("bpm", "spectral_deviation"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Spectral deviation", xlab = "BPM",
+        hide.label = TRUE)
+```
+```{r}
+fvisgam(modelo30, view = c("bpm", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumentation", xlab = "BPM",
+        hide.label = TRUE)
+```
+
+```{r}
+fvisgam(modelo30, view = c("bpm", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "BPM",
+        hide.label = TRUE)
+```
+
+```{r}
+fvisgam(modelo30, view = c("hfc", "spectral_deviation"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Spectal deviation", xlab = "HFC",
+        hide.label = TRUE)
+```
+```{r}
+fvisgam(modelo30, view = c("hfc", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumentation", xlab = "HFC",
+        hide.label = TRUE)
+```
+```{r}
+fvisgam(modelo30, view = c("hfc", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "HFC",
+        hide.label = TRUE)
+```
+```{r}
+fvisgam(modelo30, view = c("vertical_density", "spectral_deviation"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumentation", xlab = "Spectral deviation",
+        hide.label = TRUE)
+```
+```{r}
+fvisgam(modelo30, view = c("spectral_deviation", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "Spectral deviation",
+        hide.label = TRUE)
+```
+```{r}
+fvisgam(modelo30, view = c("vertical_density", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "Instrumentation",
+        hide.label = TRUE)
+```
+# todo el índice en 1
+
+```{r, fig.width=8, fig.height=8}
+par(mfrow = c(4, 3))
+# Plot 1
+fvisgam(modelo30, view = c("bpm", "hfc"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "HFC", xlab = "BPM",
+        hide.label = TRUE)
+
+# Plot 2
+fvisgam(modelo30, view = c("bpm", "spectral_deviation"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Spectral deviation", xlab = "BPM",
+        hide.label = TRUE)
+
+# Plot 3
+fvisgam(modelo30, view = c("bpm", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumetation", xlab = "BPM",
+        hide.label = TRUE)
+
+# Plot 4
+fvisgam(modelo30, view = c("bpm", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "BPM",
+        hide.label = TRUE)
+
+# Plot 5
+fvisgam(modelo30, view = c("hfc", "spectral_deviation"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Spectal deviation", xlab = "HFC",
+        hide.label = TRUE)
+
+# Plot 6
+fvisgam(modelo30, view = c("hfc", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumetation", xlab = "HFC",
+        hide.label = TRUE)
+
+# Plot 7
+fvisgam(modelo30, view = c("hfc", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "HFC",
+        hide.label = TRUE)
+
+# Plot 8
+fvisgam(modelo30, view = c("vertical_density", "spectral_deviation"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumetation", xlab = "Spectral deviation",
+        hide.label = TRUE)
+
+# Plot 9
+fvisgam(modelo30, view = c("spectral_deviation", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "Spectral deviation",
+        hide.label = TRUE)
+
+# Plot 10
+fvisgam(modelo30, view = c("vertical_density", "zcr"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "ZCR", xlab = "Instrumetation",
+        hide.label = TRUE)
+
+# Exportando gráfico pdf
+dev.copy(tiff, 'graphics_paper2/Gam4.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+
+dev.off()
+
+```
+
+# Índice neutral {.tabset .tabset-fade .tabset-pills}
+
+## Opción 1
+
+```{r, fig.height=4, width=3}
+df_indices <- df_indices %>% 
+  rename(Neutral_index = comp3)
+modelo51 <- gam(Neutral_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2),
+                data = df_indices)
+
+fvisgam(modelo51, view = c("bpm", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "", ylab = "Instrumetation", xlab = "BPM",
+        hide.label = TRUE)
+
+# Exportando gráfico pdf
+dev.copy(tiff, 'graphics_paper2/Gam3.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+
+dev.off()
+
+```
+
+# Los gráficos que van en el artículo
+
+```{r, fig.width=8, fig.height=3.2}
+par(mfrow = c(1, 3))
+# Plot 1
+fvisgam(modelo17, view = c("bpm", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "A. Positive high arousal index", ylab = "Instrumentation", xlab = "BPM",
+        hide.label = TRUE)
+
+
+# Plot 2
+fvisgam(modelo30, view = c("hfc", "spectral_deviation"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "B. Negative high arousal index", ylab = "Spectal deviation", xlab = "HFC",
+        hide.label = TRUE)
+
+# Plot 3
+
+fvisgam(modelo51, view = c("bpm", "vertical_density"), color = "cm",
+        rm.ranef = TRUE, col = "black", add.color.legend = FALSE,
+        main = "C. Positive low arousal index", ylab = "Instrumetation", xlab = "BPM",
+        hide.label = TRUE)
+
+# Exportando gráfico pdf
+dev.copy(tiff, 'graphics_paper2/todoslosGAM.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+
+dev.off()
+
+```
+```
+
+# Métricas (RF) {.tabset .tabset-fade .tabset-pills}
+
+
+## índice positivo
+
+```{r}
+# Bibliotecas
+library(tidymodels)
+
+# Datos
+datos_modelos <- read_excel("datos_indices_acp_paper2.xlsx") %>% 
+  select(centroid:vertical_density, comp1)
+
+# Declaración del modelo
+modelo_rf <- rand_forest() %>%
+  set_engine(engine = "ranger", importance = "impurity") %>%
+  set_mode(mode = "regression")
+
+# Ajuste del modelo
+set.seed(123)
+ajuste_modelo <- modelo_rf %>% 
+  fit(comp1 ~ ., data = datos_modelos)
+
+# Métricas
+library(DALEX)
+library(DALEXtra)
+custom_predict <- function(object, newdata) {
+  pred = predict(object, newdata)
+  response = pred$.pred
+  return(response)
+}
+
+set.seed(123)
+prueba_explainer <- explain(
+  ajuste_modelo,
+  data = datos_modelos %>% select(-comp1),
+  y = datos_modelos$comp1,
+  label = "",
+  predict_function = custom_predict,
+  colorize = FALSE,
+  verbose = FALSE
+)
+
+model_performance(prueba_explainer)
+```
+
+
+## índice negativo
+
+```{r}
+# Datos para modelos
+datos_modelos2 <- read_excel("datos_indices_acp_paper2.xlsx")  %>% 
+  select(centroid:vertical_density, comp2)
+
+# Declaración del modelo
+modelo_rf2 <- rand_forest() %>%
+  set_engine(engine = "ranger", importance = "impurity") %>%
+  set_mode(mode = "regression")
+
+# Ajuste del modelo
+set.seed(123)
+ajuste_modelo2 <- modelo_rf2 %>% 
+  fit(comp2 ~ ., data = datos_modelos2)
+
+# Métricas
+set.seed(123)
+prueba_explainer1 <- explain(
+  ajuste_modelo2,
+  data = datos_modelos2 %>% select(-comp2),
+  y = datos_modelos2$comp2,
+  label = "",
+  predict_function = custom_predict,
+  colorize = FALSE,
+  verbose = FALSE
+)
+
+model_performance(prueba_explainer1)
+```
+
+
+## índice neutral
+
+```{r}
+# Datos para modelos
+datos_modelos3 <-  read_excel("datos_indices_acp_paper2.xlsx") %>% 
+  select(centroid:vertical_density, comp3)
+
+# Declaración del modelo
+modelo_rf3 <- rand_forest() %>%
+  set_engine(engine = "ranger", importance = "impurity") %>%
+  set_mode(mode = "regression")
+
+# Ajuste del modelo
+set.seed(123)
+ajuste_modelo3 <- modelo_rf3 %>% 
+  fit(comp3 ~ ., data = datos_modelos3)
+
+# Métricas
+set.seed(123)
+prueba_explainer2 <- explain(
+  ajuste_modelo3,
+  data = datos_modelos3 %>% select(-comp3),
+  y = datos_modelos3$comp3,
+  label = "",
+  predict_function = custom_predict,
+  colorize = FALSE,
+  verbose = FALSE
+)
+
+model_performance(prueba_explainer2)
+```
+
+
+
+# Importancia de variables {.tabset .tabset-fade .tabset-pills}
+
+## Índice positivo
+
+```{r}
+prueba_imp <- model_parts(prueba_explainer)
+g1 <- plot(prueba_imp) +
+  labs(title = "", subtitle = "", y  = "") +
+  scale_x_discrete(labels = c(
+    "zcr" = "ZCR",
+    "dissonance" = "Dissonance",
+    "spectral_deviation" = "Spectral Deviation",
+    "bpm" = "BPM",
+    "centroid" = "Centroid",
+    "amplitude" = "Amplitude",
+    "hfc" = "HFC",
+    "vertical_density" = "Vertical Density"
+  )) +
+  scale_color_manual(values = "gray60") +
+  theme(axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"),
+        axis.text = element_text(color = "black"),
+        axis.title.x = element_text(color = "black"),
+        axis.title.y = element_text(color = "black"))
+g1
+
+```
+
+
+## Índice negativo
+
+```{r}
+prueba_imp2 <- model_parts(prueba_explainer1)
+g2 <- plot(prueba_imp2) +
+  labs(title = "", subtitle = "", y = "") +
+  scale_x_discrete(labels = c(
+    "zcr" = "ZCR",
+    "dissonance" = "Dissonance",
+    "spectral_deviation" = "Spectral Deviation",
+    "bpm" = "BPM",
+    "centroid" = "Centroid",
+    "amplitude" = "Amplitude",
+    "hfc" = "HFC",
+    "vertical_density" = "Vertical Density"
+  )) +
+  scale_color_manual(values = "gray60") +
+  theme(axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"),
+        axis.text = element_text(color = "black"),
+        axis.title.x = element_text(color = "black"),
+        axis.title.y = element_text(color = "black"))
+g2
+```
+
+## Índice neutral
+
+```{r}
+prueba_imp3 <- model_parts(prueba_explainer2)
+g3 <- plot(prueba_imp3) +
+  labs(title = "", subtitle = "", y = "") +
+  scale_x_discrete(labels = c(
+    "zcr" = "ZCR",
+    "dissonance" = "Dissonance",
+    "spectral_deviation" = "Spectral Deviation",
+    "bpm" = "BPM",
+    "centroid" = "Centroid",
+    "amplitude" = "Amplitude",
+    "hfc" = "HFC",
+    "vertical_density" = "Vertical Density"
+  )) +
+  scale_color_manual(values = "gray60") +
+  theme(axis.text.x = element_text(color = "black"),
+        axis.text.y = element_text(color = "black"),
+        axis.text = element_text(color = "black"),
+        axis.title.x = element_text(color = "black"),
+        axis.title.y = element_text(color = "black"))
+g3
+```
+
+## 3 en 1
+
+```{r, fig.width=8, fig.height=4}
+library(ggpubr)
+ggarrange(g1, g2, g3, ncol = 3, nrow = 1) %>% 
+  annotate_figure(bottom = text_grob("Root mean square error (RMSE) loss after permutations"))
+```
+
+# Dependencias parciales - CP1 {.tabset .tabset-fade .tabset-pills}
+
+## ZCR
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer, N = 5000, variables = "zcr")
+
+ggplot_pdp <- function(obj, x) {
+  
+  p <- 
+    as_tibble(obj$agr_profiles) %>%
+    mutate(`_label_` = stringr::str_remove(`_label_`, "^[^_]*_")) %>%
+    ggplot(aes(`_x_`, `_yhat_`)) +
+    geom_line(data = as_tibble(obj$cp_profiles),
+              aes(x = {{ x }}, group = `_ids_`),
+              size = 0.7, alpha = 0.1, color = "gray50")
+  
+  num_colors <- n_distinct(obj$agr_profiles$`_label_`)
+  
+  if (num_colors > 1) {
+    p <- p + geom_line(aes(color = `_label_`), size = 1.2, alpha = 0.8)
+  } else {
+    p <- p + geom_line(color = "midnightblue", size = 1.2, alpha = 0.8)
+  }
+  
+  p
+}
+
+dp1 <- ggplot_pdp(prueba, zcr)  +
+  labs(x = "ZCR", 
+       y = "Positive Index", 
+       color = NULL)
+
+dp1
+```
+
+## Disonancia
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer, N = 5000, variables = "dissonance")
+
+dp2 <- ggplot_pdp(prueba, dissonance)  +
+  labs(x = "Dissonance", 
+       y = "Positive Index", 
+       color = NULL)
+dp2
+```
+
+## Disonancia
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer, N = 5000, variables = "spectral_deviation")
+
+dp3 <- ggplot_pdp(prueba, spectral_deviation)  +
+  labs(x = "Spectral deviation", 
+       y = "Positive Index", 
+       color = NULL)
+dp3
+```
+
+## BPM
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer, N = 5000, variables = "bpm")
+
+dp4 <- ggplot_pdp(prueba, bpm)  +
+  labs(x = "BPM", 
+       y = "Positive Index", 
+       color = NULL)
+dp4
+```
+
+## Todos en uno
+
+```{r, fig.width=8, fig.height=4}
+ggarrange(dp1, dp2, dp3, dp4, ncol = 2, nrow = 2)
+```
+
+# Dependencias parciales - CP2 {.tabset .tabset-fade .tabset-pills}
+
+## Amplitud
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer1, N = 5000, variables = "amplitude")
+
+dp1 <- ggplot_pdp(prueba, amplitude)  +
+  labs(x = "Amplitude", 
+       y = "Negative Index", 
+       color = NULL)
+
+dp1
+```
+
+## Densidad vertical
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer1, N = 5000, variables = "vertical_density")
+
+dp2 <- ggplot_pdp(prueba, vertical_density)  +
+  labs(x = "Vertical density", 
+       y = "Negative Index", 
+       color = NULL)
+dp2
+```
+
+## Centroide
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer1, N = 5000, variables = "centroid")
+
+dp3 <- ggplot_pdp(prueba, centroid)  +
+  labs(x = "Centroid", 
+       y = "Negative Index", 
+       color = NULL)
+dp3
+```
+
+## BPM
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer1, N = 5000, variables = "bpm")
+
+dp4 <- ggplot_pdp(prueba, bpm)  +
+  labs(x = "BPM", 
+       y = "Negative Index", 
+       color = NULL)
+dp4
+```
+
+## Todos en uno
+
+```{r, fig.width=8, fig.height=4}
+ggarrange(dp1, dp2, dp3, dp4, ncol = 2, nrow = 2)
+```
+
+
+# Dependencias parciales - CP3 {.tabset .tabset-fade .tabset-pills}
+
+## Densidad vertical
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer2, N = 5000, variables = "vertical_density")
+
+dp2 <- ggplot_pdp(prueba, vertical_density)  +
+  labs(x = "Vertical density", 
+       y = "Neutral Index", 
+       color = NULL)
+dp2
+```
+
+## Amplitud
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer2, N = 5000, variables = "amplitude")
+
+dp1 <- ggplot_pdp(prueba, amplitude)  +
+  labs(x = "Amplitude", 
+       y = "Neutral Index", 
+       color = NULL)
+
+dp1
+```
+
+
+## Centroide
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer2, N = 5000, variables = "centroid")
+
+dp3 <- ggplot_pdp(prueba, centroid)  +
+  labs(x = "Centroid", 
+       y = "Neutral Index", 
+       color = NULL)
+dp3
+```
+
+## Desviación espectral
+
+```{r}
+set.seed(123)
+prueba <- model_profile(prueba_explainer2, N = 5000, variables = "spectral_deviation")
+
+dp4 <- ggplot_pdp(prueba, spectral_deviation)  +
+  labs(x = "Spectral deviation", 
+       y = "Neutral Index", 
+       color = NULL)
+dp4
+```
+
+## Todos en uno
+
+```{r, fig.width=8, fig.height=4}
+ggarrange(dp2, dp1, dp3, dp4, ncol = 2, nrow = 2)
+```
+
+# Correlaciones
+
+```{r}
+datos <- read_excel("../14 Febrero 2020 English2.xlsx") %>% 
+  clean_names() %>% 
+  select(-c(replicate, frustrated, distressed, apathetic,
+            tonalidad, ataques, sistema, intervalos,
+            nivel_de_disonancia_vertical, melodia,
+            niveldecontrapunto, compas, ritmo, fraseo_articulaciones,
+            ataques_en_melodia, intensidad, timbre))
+
+acp <- PCA(X = datos %>% select(active:happy), scale.unit = TRUE,
+           ncp = 3, graph = FALSE)
+
+
+df_indices <- datos %>% 
+  mutate(comp1 = acp$ind$coord[, 1],
+         comp2 = acp$ind$coord[, 2],
+         comp3 = acp$ind$coord[, 3])
+
+valores_p <- cor.mtest(df_indices  %>% 
+  select(c(centroid:vertical_density, comp1:comp3)))$p %>% 
+  as.data.frame() %>% 
+  select(comp1, comp2, comp3)  %>% 
+  slice(-c(9, 10 , 11)) %>% 
+  as.matrix() %>% 
+  t()
+
+df_indices %>%
+  select(c(centroid:vertical_density, comp1:comp3)) %>%
+  rename(
+    "ZCR" = "zcr",
+    "Dissonance" = "dissonance",
+    "Spectral Deviation" = "spectral_deviation",
+    "BPM" = "bpm",
+    "Centroid" = "centroid",
+    "Amplitude" = "amplitude",
+    "HFC" = "hfc",
+    "Vertical Density" = "vertical_density",
+    "Positive Index" = "comp1",
+    "Negative Index" = "comp2",
+    "Neutral Index" = "comp3"
+  ) %>% 
+  cor(method = "spearman") %>%
+  as.data.frame() %>%
+  select(`Positive Index`, `Negative Index`, `Neutral Index`)  %>%
+  slice(-c(9, 10 , 11)) %>%
+  as.matrix() %>%
+  t() %>%
+  corrplot(
+    sig.level = 0.05,
+    method = 'pie',
+    number.cex = 0.8,
+    p.mat = valores_p,
+    tl.col = "black",
+    tl.srt = 35)
+```
+
+# Dispersiones
+
+```{r, fig.width=8, fig.height=3}
+g1 <- df_indices %>% 
+  ggplot(aes(x = vertical_density, y = comp1)) +
+  geom_point(color = "gray50", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "dodgerblue4", size = 1) +
+  geom_smooth(method = "gam", se = FALSE, color = "orangered", size = 1,
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "dodgerblue", size = 1,
+              formula = y ~ ns(x, df = 3)) +
+  labs(x = "", y = "Positive Index")
+
+g2 <- df_indices %>% 
+  ggplot(aes(x = vertical_density, y = comp2)) +
+  geom_point(color = "gray50", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "dodgerblue4", size = 1) +
+  geom_smooth(method = "gam", se = FALSE, color = "orangered", size = 1,
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "dodgerblue", size = 1,
+              formula = y ~ ns(x, df = 3))  +
+  labs(x = "", y = "Negative Index")
+
+g3 <- df_indices %>% 
+  ggplot(aes(x = vertical_density, y = comp3)) +
+  geom_point(color = "gray50", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "dodgerblue4", size = 1) +
+  geom_smooth(method = "gam", se = FALSE, color = "orangered", size = 1,
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "dodgerblue", size = 1,
+              formula = y ~ ns(x, df = 3))  +
+  labs(x = "", y = "Neutral Index")
+
+library(ggpubr)
+ggarrange(g1, g2, g3, ncol = 3, nrow = 1) %>% 
+  annotate_figure(bottom = text_grob("Vertical density"))
+```
+

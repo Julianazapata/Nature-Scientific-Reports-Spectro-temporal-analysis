@@ -1,0 +1,1345 @@
+---
+title: "Emociones y parámetros acústicos"
+subtitle: "Paper 2"
+author: "Juliana Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.width = 9)
+```
+
+# Bibliotecas
+
+```{r}
+library(tidyverse) # manejo y visualización de datos
+library(janitor) # edición de nombres
+library(readxl) # lectura de datos en excel
+library(FactoMineR) # análisis multivariado
+library(factoextra) # funciones extras para análisis multivariado
+library(explor) # app shiny para ver resultados análisis multivariado
+library(DT) # Imprimir tablas interactivas
+library(corrplot) # correlograma
+library(splines) # Agregar no linealidad a dispersiones
+library(mgcv) # Modelos GAM
+
+# Personalizano tema de ggplot2
+theme_set(theme_minimal())
+```
+
+# Datos
+
+```{r}
+datos <- read_excel("~/Desktop/Github/Prototipo/paper 2/14 Febrero 2020 English2.xlsx") %>% 
+  clean_names() %>% 
+  select(-c(replicate, frustrated, distressed, apathetic,
+            tonalidad, ataques, sistema, intervalos,
+            nivel_de_disonancia_vertical, melodia,
+            niveldecontrapunto, compas, ritmo, fraseo_articulaciones,
+            ataques_en_melodia, intensidad, timbre))
+datos
+```
+
+# Análisis de componentes principales
+
+## Ajuste
+
+```{r}
+acp <- PCA(X = datos %>% select(active:happy), scale.unit = TRUE,
+           ncp = 3, graph = FALSE)
+```
+
+## Retención de variabilidad
+
+```{r}
+acp$eig %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "componente") %>%
+  mutate(across(where(is.numeric), round, digits = 2)) %>% 
+  datatable(rownames = FALSE,
+            extensions = 'Buttons',
+            options = list(dom = 'Bfrtip',
+                           buttons = c('excel')))
+```
+
+## Correlaciones {.tabset .tabset-fade .tabset-pills}
+
+### Tabla
+
+```{r}
+acp$var$coord %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "adjetivo") %>%
+  mutate(across(where(is.numeric), round, digits = 2)) %>% 
+  datatable(rownames = FALSE,
+            extensions = 'Buttons',
+            options = list(dom = 'Bfrtip',
+                           buttons = c('excel')))
+```
+
+### Gráfico
+
+```{r}
+acp$var$coord %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "adjetivo") %>% 
+  pivot_longer(cols = -adjetivo) %>% 
+  mutate(signo = ifelse(value > 0, "Positivo", "Negativo")) %>% 
+  ggplot(aes(x = adjetivo, y = value, color = signo, fill = signo)) +
+  facet_wrap(~name, scales = "free") +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(y = "Correlación", x = "")
+```
+
+## Índices
+
+- **Nota:** vamos a exportar los datos con los índices obtenidos del análisis de componentes principales.
+
+```{r}
+#writexl::write_xlsx(df_indices, path = "datos_indices_acp_paper2.xlsx")
+df_indices <- datos %>% 
+  mutate(Positive_index = acp$ind$coord[, 1],
+         Negative_index= acp$ind$coord[, 2],
+         Neutral_index = acp$ind$coord[, 3])
+df_indices
+```
+# ACP con Dimensiones
+
+```{r} 
+datos_acp <- df_indices %>% 
+  select(centroid:vertical_density, Positive_index:Neutral_index)
+
+acp <- PCA(X = datos_acp, scale.unit = TRUE,  graph = FALSE, ncp = 7)
+summary(acp)
+```
+
+```{r}
+fviz_screeplot(acp, ncp = 7)
+```
+## ACP correlaciones
+```{r, fig.width=11, fig.height=8}
+library(ggpubr)
+ggarrange(
+  fviz_contrib(X = acp, axes = 1, choice = "var") + coord_flip() ,
+  fviz_contrib(X = acp, axes = 2, choice = "var") + coord_flip() ,
+  fviz_contrib(X = acp, axes = 3, choice = "var") + coord_flip() ,
+  ncol = 3
+)
+
+
+acp$var$coord %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "Acoustic_parameter") %>% 
+  pivot_longer(cols = -Acoustic_parameter) %>% 
+  mutate(signo = ifelse(value > 0, "Positivo", "Negativo")) %>% 
+  ggplot(aes(x = Acoustic_parameter, y = value, color = signo, fill = signo)) +
+  facet_wrap(~name, scales = "free") +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(y = "Correlación", x = "",
+       title = "C", color = "")
+  
+```
+## ACP gráficos
+```{r, fig.width=10, fig.height=5}
+ggarrange(
+fviz_pca_var(acp, axes = c(1, 2),  
+               select.var = list(contrib = 11), graph=FALSE,
+               geom = c("arrow", "text"), col.var = "black", labelsize=4,
+               fill.var = "grey", alpha.var = 0, col.quanti.sup = "blue",
+               repel = TRUE) +
+        theme(panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank()) +
+        labs(x = "PC1(26.7%)", y = "PC2(20.5%)",
+        title = "A", color = ""),
+
+  fviz_pca_var(acp, axes = c(1, 3),  
+               select.var = list(contrib = 9), graph=FALSE,
+               geom = c("point", "text"), col.var = "black", labelsize=4,
+               fill.var = "grey", alpha.var = 0, col.quanti.sup = "blue",
+               repel = TRUE) +
+        theme(panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank()) +
+        labs(x = "PC1(26.7%)", y = "PC3(14.%)",
+        title = "B", color = ""),
+    ncol = 2)
+
+```
+
+# Parámetros acústicos
+
+## Correlación {.tabset .tabset-fade .tabset-pills}
+
+### Gráfico cuantil-cuantil
+
+```{r}
+datos %>% 
+  select(centroid:vertical_density) %>% 
+  pivot_longer(cols = everything()) %>% 
+  ggplot(aes(sample = value)) +
+  facet_wrap(~name, scales = "free") +
+  geom_qq() +
+  geom_qq_line()
+```
+
+### Shapiro Wilk
+
+```{r}
+datos %>% 
+  select(centroid:vertical_density) %>% 
+  pivot_longer(cols = everything()) %>% 
+  group_by(name) %>% 
+  summarise(valor_p_shapiro = shapiro.test(value)$p.value) %>% 
+  ungroup()
+```
+
+### Spearman
+
+```{r}
+datos %>% 
+  select(centroid:vertical_density) %>% 
+  cor(method = "spearman") %>% 
+  corrplot(
+    diag = FALSE,
+    type = "lower",
+    tl.col = "black",
+    tl.srt = 10,
+    method = "pie"
+  )
+```
+```{r, fig.width=9}
+library(Hmisc)
+mtx_cor1 <- df_indices %>% 
+  select_if(is.numeric) %>% 
+  select(-c(active:happy)) %>% 
+  as.matrix() %>% 
+  rcorr(type = "spearman")
+
+matriz_cor <- mtx_cor1$r[9:11, -c(9:11)] 
+matrix_p <- mtx_cor1$P[9:11, -c(9:11)]   
+
+corrplot(
+  corr = matriz_cor,
+  method = 'number',
+  col = c("#D7D29E", "#6794a7"), bg = ("white"), 
+  tl.col = "black",
+  tl.srt = 50,
+  number.cex = 0.9,
+  addgrid.col = "black"
+  )
+```
+```{r, fig.width=9}
+valores_p <- cor.mtest(df_indices  %>% 
+  select(c(centroid:vertical_density, Positive_index:Neutral_index)))$p %>% 
+  as.data.frame() %>% 
+  select(Positive_index, Negative_index, Neutral_index)  %>% 
+  slice(-c(9, 10 , 11)) %>% 
+  as.matrix() %>% 
+  t()
+
+df_indices %>%
+  select(c(centroid:vertical_density, Positive_index:Neutral_index)) %>%
+  cor(method = "spearman") %>%
+  as.data.frame() %>%
+  select(Positive_index, Negative_index, Neutral_index)  %>%
+  slice(-c(9, 10 , 11)) %>%
+  as.matrix() %>%
+  t() %>%
+  corrplot(
+    sig.level = 0.05,
+    method = 'number',
+    col = c("#D7D29E", "#6794a7"), bg = ("white"), 
+    tl.col = "black",
+    tl.srt = 50,
+    addgrid.col = "black",
+    number.cex = 1.5,
+    p.mat = valores_p)
+```
+
+
+# Parámetros acústicos vs Índices {.tabset .tabset-fade .tabset-pills}
+
+## Índice positivo 
+
+```{r, fig.height=6.5}
+df_indices %>% 
+  select(Positive_index, centroid:vertical_density) %>% 
+  pivot_longer(cols = -c(Positive_index),
+               names_to = "parametros", values_to = "valores_acusticos") %>% 
+  ggplot(aes(x = valores_acusticos, y = Positive_index)) +
+  facet_wrap(~parametros, scales = "free", ncol = 4) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3)) +
+  labs(caption = "Línea roja: modelo lineal \n
+       Línea azul: cuadrático \n
+       Línea amarilla: cúbico")
+```
+
+## Índice negativo
+
+```{r, fig.height=6.5}
+df_indices %>% 
+  select(Negative_index, centroid:vertical_density) %>% 
+  pivot_longer(cols = -c(Negative_index),
+               names_to = "parametros", values_to = "valores_acusticos") %>% 
+  ggplot(aes(x = valores_acusticos, y = Negative_index)) +
+  facet_wrap(~parametros, scales = "free", ncol = 4) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3)) +
+  labs(caption = "Línea roja: modelo lineal \n
+       Línea azul: cuadrático \n
+       Línea amarilla: cúbico")
+```
+
+## Índice neutro
+
+```{r, fig.height=6.5}
+df_indices %>% 
+  select(Neutral_index, centroid:vertical_density) %>% 
+  pivot_longer(cols = -c(Neutral_index),
+               names_to = "parametros", values_to = "valores_acusticos") %>% 
+  ggplot(aes(x = valores_acusticos, y = Neutral_index)) +
+  facet_wrap(~parametros, scales = "free", ncol = 4) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3)) +
+  labs(caption = "Línea roja: modelo lineal \n
+       Línea azul: cuadrático \n
+       Línea amarilla: cúbico")
+```
+
+## Todos los índices
+
+```{r}
+df_indices %>% 
+  select(Positive_index:Neutral_index, centroid:vertical_density) %>% 
+  pivot_longer(cols = -c(Positive_index, Negative_index, Neutral_index),
+               names_to = "parametros", values_to = "valores_acusticos") %>% 
+  pivot_longer(cols = -c(parametros, valores_acusticos),
+               names_to = "indice", values_to = "valores_indices") %>% 
+  ggplot(aes(x = valores_acusticos, y = valores_indices)) +
+  facet_grid(~indice~parametros, scales = "free") +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3))
+```
+## Dispersiones de las variables seleccionadas 
+
+```{r, fig.width=8, fig.height=4}
+g1 <- df_indices %>% 
+  ggplot(aes(x = vertical_density, y = Positive_index)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3))
+
+g2 <- df_indices %>% 
+  ggplot(aes(x = vertical_density, y = Negative_index)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3))
+
+g3 <- df_indices %>% 
+  ggplot(aes(x = vertical_density, y = Neutral_index)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3))
+
+ggarrange(g1, g2, g3, ncol = 3, nrow = 1)
+```
+
+# Distribuciones índices {.tabset .tabset-fade .tabset-pills}
+
+## Densidades
+
+```{r}
+df_indices %>% 
+  select(Positive_index:Neutral_index) %>% 
+  pivot_longer(cols = everything()) %>% 
+  ggplot(aes(x = value)) +
+  facet_wrap(~name, scales = "free") +
+  geom_density()
+```
+
+## Cuantil-Cuantil
+
+```{r}
+df_indices %>% 
+  select(Positive_index:Neutral_index) %>% 
+  pivot_longer(cols = everything()) %>% 
+  ggplot(aes(sample = value)) +
+  facet_wrap(~name, scales = "free") +
+  geom_qq() +
+  geom_qq_line()
+```
+
+## Shapiro Wilk
+
+```{r}
+df_indices %>% 
+  select(Positive_index:Neutral_index) %>% 
+  pivot_longer(cols = everything()) %>% 
+  group_by(name) %>% 
+  summarise(valor_p_shapiro = shapiro.test(value)$p.value) %>% 
+  ungroup()
+```
+
+# Modelos GAM Componente 1
+
+## Ajuste y comparación
+
+- **Comparación de modelos con AIC:**
+
+```{r}
+modelo01 <- gam(Positive_index ~ centroid, data = df_indices)
+modelo02 <- gam(Positive_index ~ amplitude, data = df_indices)
+modelo03 <- gam(Positive_index ~ dissonance, data = df_indices)
+modelo04 <- gam(Positive_index ~ hfc, data = df_indices)
+modelo05 <- gam(Positive_index ~ zcr, data = df_indices)
+modelo06 <- gam(Positive_index ~ spectral_deviation, data = df_indices)
+modelo07 <- gam(Positive_index ~ bpm, data = df_indices)
+modelo08 <- gam(Positive_index ~ vertical_density, data = df_indices)
+modelo09 <- gam(Positive_index ~ centroid
+                + ns(amplitude, df = 2)
+                + ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo10 <- gam(Positive_index ~ ns(amplitude, df = 2)
+                + ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+
+modelo11 <- gam(Positive_index ~ ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo12 <- gam(Positive_index ~ ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo13 <- gam(Positive_index ~ ns(bpm, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo14 <- gam(Positive_index ~ ns(bpm, df = 2)
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo15 <- gam(Positive_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo16 <- gam(Positive_index ~ ns(bpm, df = 2)
+                + zcr,
+                data = df_indices)
+modelo17 <- gam(Positive_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2),
+                data = df_indices)
+
+
+AIC(modelo01, modelo02, modelo03, modelo04, modelo05, modelo06,
+    modelo07, modelo08, modelo09, modelo10, modelo11, modelo12,
+    modelo13, modelo14, modelo15, modelo16, modelo17)
+```
+
+- Análisis de varianza para comparar modelos:
+
+```{r}
+anova(
+  modelo01,
+  modelo02,
+  modelo03,
+  modelo04,
+  modelo05,
+  modelo06,
+  modelo07,
+  modelo08,
+  modelo09,
+  modelo10,
+  modelo11,
+  modelo12,
+  modelo13,
+  modelo14,
+  modelo15,
+  modelo16,
+  modelo17,
+  test = "Chisq"
+)
+```
+
+## Resumen del modelo
+
+```{r}
+summary(modelo17)
+```
+
+### Anova del modelo
+
+```{r}
+anova(modelo17)
+```
+
+### Residuales {.tabset .tabset-fade .tabset-pills}
+
+#### Normalidad
+
+- Gráfico cuantil cuantil:
+
+```{r}
+library(ggpubr)
+residuals(modelo17) %>% 
+  ggqqplot()
+```
+
+- Prueba de shapiro wilk:
+
+```{r}
+shapiro.test(residuals(modelo17))
+```
+
+#### Homocedasticidad
+
+```{r}
+data.frame(
+  residuales = residuals(modelo17),
+  ajustados = fitted(modelo17)
+) %>% 
+  ggplot(aes(x = ajustados, y = residuales)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", lty = 2) +
+  geom_smooth(se = FALSE)
+```
+
+### Curvas predichas
+
+```{r}
+plot(modelo17, all.terms = TRUE, seWithMean = TRUE,
+     shift = coef(modelo17)[1])
+```
+
+### Predicciones manuales {.tabset .tabset-fade .tabset-pills}
+
+#### BPM
+
+```{r}
+datos_bpm <- seq(min(df_indices$bpm), max(df_indices$bpm), length = 150)
+datos_dve <- seq(min(df_indices$vertical_density), 
+                 max(df_indices$vertical_density), length = 150)
+
+datos_predicciones <- expand.grid(bpm = datos_bpm,
+                                  vertical_density = datos_dve)
+
+predicciones <- predict(object = modelo17, newdata = datos_predicciones)
+
+datos_finales <- datos_predicciones %>% 
+  mutate(predichos = predicciones)
+
+datos_finales %>% 
+  group_by(bpm) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = bpm, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+
+#### Densidad vertical
+
+```{r}
+datos_finales %>% 
+  group_by(vertical_density) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = vertical_density, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+
+#### Superficie
+
+```{r}
+datos_finales %>% 
+  ggplot(aes(x = bpm, y = vertical_density, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+```
+
+#### Perspectiva
+
+```{r}
+vis.gam(modelo17, plot.type = "persp", theta = 120)
+```
+
+#### Contorno
+
+```{r}
+vis.gam(modelo17, plot.type = "contour")
+```
+
+
+# Modelos GAM Componente 2
+
+## Ajuste y comparación
+
+- **Comparación de modelos con AIC:**
+
+```{r}
+modelo18 <- gam(Negative_index ~ centroid, data = df_indices)
+modelo19 <- gam(Negative_index ~ amplitude, data = df_indices)
+modelo20 <- gam(Negative_index ~ dissonance, data = df_indices)
+modelo21 <- gam(Negative_index ~ hfc, data = df_indices)
+modelo22 <- gam(Negative_index ~ zcr, data = df_indices)
+modelo23 <- gam(Negative_index ~ spectral_deviation, data = df_indices)
+modelo24 <- gam(Negative_index ~ bpm, data = df_indices)
+modelo25 <- gam(Negative_index ~ vertical_density, data = df_indices)
+modelo26 <- gam(Negative_index ~ centroid
+                + ns(amplitude, df = 2)
+                + ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2), 
+                data = df_indices)
+modelo27 <- gam(Negative_index ~ ns(amplitude, df = 2)
+                + ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+
+modelo28 <- gam(Negative_index ~ ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+modelo29 <- gam(Negative_index ~ ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+modelo30 <- gam(Negative_index ~ ns(bpm, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+modelo31 <- gam(Negative_index ~ ns(bpm, df = 2)
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+modelo32 <- gam(Negative_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+modelo33 <- gam(Negative_index ~ ns(bpm, df = 2)
+                + ns(zcr, df = 2),
+                data = df_indices)
+modelo34 <- gam(Negative_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2),
+                data = df_indices)
+
+
+AIC(modelo18, modelo19, modelo20, modelo21, modelo22, modelo23,
+    modelo24, modelo25, modelo26, modelo27, modelo28, modelo29,
+    modelo30, modelo31, modelo32, modelo33, modelo34)
+```
+
+- Análisis de varianza para comparar modelos:
+
+```{r}
+anova(
+  modelo18,
+  modelo19,
+  modelo20,
+  modelo21,
+  modelo22,
+  modelo23,
+  modelo24,
+  modelo25,
+  modelo26,
+  modelo27,
+  modelo28,
+  modelo29,
+  modelo30,
+  modelo31,
+  modelo32,
+  modelo33,
+  modelo34,
+  test = "Chisq"
+)
+```
+
+## Resumen del modelo
+
+```{r}
+summary(modelo30)
+```
+
+### Anova del modelo
+
+```{r}
+anova(modelo30)
+```
+## Resumen del modelo 18
+
+```{r}
+summary(modelo18)
+```
+### Anova del modelo
+
+```{r}
+anova(modelo18)
+```
+
+### Residuales {.tabset .tabset-fade .tabset-pills}
+
+#### Normalidad
+
+- Gráfico cuantil cuantil:
+
+```{r}
+library(ggpubr)
+residuals(modelo30) %>% 
+  ggqqplot()
+```
+
+- Prueba de shapiro wilk:
+
+```{r}
+shapiro.test(residuals(modelo30))
+```
+
+#### Homocedasticidad
+
+```{r}
+data.frame(
+  residuales = residuals(modelo30),
+  ajustados = fitted(modelo30)
+) %>% 
+  ggplot(aes(x = ajustados, y = residuales)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", lty = 2) +
+  geom_smooth(se = FALSE)
+```
+
+### Curvas predichas
+
+```{r}
+plot(modelo30, all.terms = TRUE, seWithMean = TRUE,
+     shift = coef(modelo30)[1])
+```
+
+## Gráficos de contorno
+
+### BPM vs HFC
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", view = c("bpm","hfc"), color = "terrain")
+```
+### BPM vs Spectral deviation
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", view = c("bpm","spectral_deviation"), color = "terrain")
+```
+### BPM vs Vertical density
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", view = c("bpm","vertical_density"))
+```
+
+### BPM vs ZCR
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", view = c("bpm","zcr"), color = "terrain")
+```
+
+### HFC vs Spectral deviation
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", view = c("hfc","spectral_deviation"), color = "terrain")
+```
+
+### HFC vs Vertical density
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", view = c("hfc","vertical_density"), color = "terrain")
+```
+
+### HFC vs ZCR
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", view = c("hfc","zcr"), color = "terrain")
+```
+
+### Spectral deviation vs vertical density
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", 
+        view = c("spectral_deviation","vertical_density"), color = "terrain")
+```
+
+### Spectral deviation vs ZCR
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", 
+        view = c("spectral_deviation","zcr"), color = "terrain")
+```
+
+### Vertical density vsZCR
+```{r}
+library (mgcViz)
+vis.gam(modelo30, plot.type = "contour", 
+        view = c("vertical_density","zcr"), color = "terrain")
+```
+
+***```{r}
+library(gratia)
+draw(modelo30)
+```
+*** ```{r}
+library(mgcViz)
+b <- getViz(modelo17)
+juliana <- plot(sm(b,1))
+plotRGL(sm(b, 1), fix = c("z" = 0), residuals = TRUE)
+print(plot(b, allTerms = T), pages = 1)
+```
+
+### Predicciones manuales {.tabset .tabset-fade .tabset-pills}
+
+```{r}
+datos_bpm <- seq(min(df_indices$bpm), max(df_indices$bpm), length = 15)
+datos_dve <- seq(min(df_indices$vertical_density), 
+                 max(df_indices$vertical_density), length = 15)
+datos_hfc <- seq(min(df_indices$hfc), 
+                 max(df_indices$hfc), length = 15)
+datos_dves <- seq(min(df_indices$spectral_deviation), 
+                 max(df_indices$spectral_deviation), length = 15)
+datos_zcr <- seq(min(df_indices$zcr), 
+                 max(df_indices$zcr), length = 15)
+
+datos_predicciones <- expand.grid(bpm = datos_bpm,
+                                  vertical_density = datos_dve,
+                                  hfc = datos_hfc,
+                                  spectral_deviation = datos_dves,
+                                  zcr = datos_zcr)
+
+predicciones <- predict(object = modelo30, newdata = datos_predicciones)
+
+datos_finales2 <- datos_predicciones %>% 
+  mutate(predichos = predicciones)
+```
+
+#### BPM
+
+```{r}
+datos_finales2 %>% 
+  group_by(bpm) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = bpm, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+
+#### Densidad vertical
+
+```{r}
+datos_finales2 %>% 
+  group_by(vertical_density) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = vertical_density, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+
+#### HFC
+
+```{r}
+datos_finales2 %>% 
+  group_by(hfc) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = hfc, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+#### Desviación espectral
+
+```{r}
+datos_finales2 %>% 
+  group_by(spectral_deviation) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = spectral_deviation, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+#### ZRC
+
+```{r}
+datos_finales2 %>% 
+  group_by(zcr) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = zcr, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+
+```{r, fig.width=10, fig.height=6}
+
+ggarrange(
+  datos_finales2 %>% 
+  group_by(hfc) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = hfc, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5),
+  
+  
+  datos_finales2 %>%   
+  group_by(zcr) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = zcr, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5),
+  
+  
+  datos_finales2 %>% 
+  group_by(spectral_deviation) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = spectral_deviation, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5),
+  
+  
+  datos_finales2 %>% 
+  group_by(bpm) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = bpm, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5),
+  
+  
+  datos_finales2 %>% 
+  group_by(vertical_density) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = vertical_density, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5),
+  ncol = 3, nrow = 2)
+
+```
+
+
+#### Superficie BPM - Densidad Vertical
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = bpm, y = vertical_density, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+#### Superficie BPM - HFC
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = bpm, y = hfc, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+#### Superficie BPM - Desviación espectral
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = bpm, y = spectral_deviation, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+#### Superficie BPM - ZCR
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = bpm, y = zcr, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+#### Superficie HFC - desviación espectral
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = hfc, y = spectral_deviation, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+
+#### Superficie HFC - densidad vertical
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = hfc, y = vertical_density, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+
+#### Superficie HFC - ZCR
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = hfc, y = zcr, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+#### Superficie Densidad Vertical - ZCR
+
+```{r}
+datos_finales2 %>% 
+  ggplot(aes(x = vertical_density, y = zcr, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+
+```
+#### Perspectiva
+
+```{r}
+vis.gam(modelo30, plot.type = "persp", theta = 120)
+```
+```{r, fig.width=10, fig.height=6}
+
+ggarrange(
+  datos_finales2 %>% 
+  ggplot(aes(x = hfc, y = zcr, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c(),
+  
+datos_finales2 %>% 
+  ggplot(aes(x = vertical_density, y = zcr, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c(),
+  ncol = 2)
+```
+
+
+# Modelos GAM Componente 3
+
+## Ajuste y comparación
+
+- **Comparación de modelos con AIC:**
+
+```{r}
+modelo35 <- gam(Neutral_index ~ centroid, data = df_indices)
+modelo36 <- gam(Neutral_index ~ amplitude, data = df_indices)
+modelo37 <- gam(Neutral_index ~ dissonance, data = df_indices)
+modelo38 <- gam(Neutral_index ~ hfc, data = df_indices)
+modelo39 <- gam(Neutral_index ~ zcr, data = df_indices)
+modelo40 <- gam(Neutral_index ~ spectral_deviation, data = df_indices)
+modelo41 <- gam(Neutral_index ~ bpm, data = df_indices)
+modelo42 <- gam(Neutral_index ~ vertical_density, data = df_indices)
+modelo43 <- gam(Neutral_index ~ centroid
+                + ns(amplitude, df = 2)
+                + ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo44 <- gam(Neutral_index ~ ns(amplitude, df = 2)
+                + ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+
+modelo45 <- gam(Neutral_index ~ ns(bpm, df = 2)
+                + ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo46 <- gam(Neutral_index ~ ns(dissonance, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo47 <- gam(Neutral_index ~ ns(bpm, df = 2)
+                + hfc
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo48 <- gam(Neutral_index ~ ns(bpm, df = 2)
+                + ns(spectral_deviation, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo49 <- gam(Neutral_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2)
+                + zcr,
+                data = df_indices)
+modelo50 <- gam(Neutral_index ~ ns(bpm, df = 2)
+                + zcr,
+                data = df_indices)
+modelo51 <- gam(Neutral_index ~ ns(bpm, df = 2)
+                + ns(vertical_density, df = 2),
+                data = df_indices)
+
+
+AIC(modelo35, modelo36, modelo37, modelo38, modelo39, modelo40,
+    modelo41, modelo42, modelo43, modelo44, modelo45, modelo46,
+    modelo47, modelo48, modelo49, modelo50, modelo51)
+```
+
+- Análisis de varianza para comparar modelos:
+
+```{r}
+anova(
+  modelo35,
+  modelo36,
+  modelo37,
+  modelo38,
+  modelo39,
+  modelo40,
+  modelo41,
+  modelo42,
+  modelo43,
+  modelo44,
+  modelo45,
+  modelo46,
+  modelo47,
+  modelo48,
+  modelo49,
+  modelo50,
+  modelo51,
+  test = "Chisq"
+)
+```
+
+## Resumen del modelo
+
+```{r}
+summary(modelo51)
+```
+
+### Anova del modelo
+
+```{r}
+anova(modelo51)
+```
+
+### Residuales {.tabset .tabset-fade .tabset-pills}
+
+#### Normalidad
+
+- Gráfico cuantil cuantil:
+
+```{r}
+library(ggpubr)
+residuals(modelo51) %>% 
+  ggqqplot()
+```
+
+- Prueba de shapiro wilk:
+
+```{r}
+shapiro.test(residuals(modelo51))
+```
+
+#### Homocedasticidad
+
+```{r}
+data.frame(
+  residuales = residuals(modelo51),
+  ajustados = fitted(modelo51)
+) %>% 
+  ggplot(aes(x = ajustados, y = residuales)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red", lty = 2) +
+  geom_smooth(se = FALSE)
+```
+
+### Curvas predichas
+
+```{r}
+plot(modelo51, all.terms = TRUE, seWithMean = TRUE,
+     shift = coef(modelo51)[1])
+```
+
+### Predicciones manuales {.tabset .tabset-fade .tabset-pills}
+
+#### BPM
+
+```{r}
+datos_bpm <- seq(min(df_indices$bpm), max(df_indices$bpm), length = 150)
+datos_dve <- seq(min(df_indices$vertical_density), 
+                 max(df_indices$vertical_density), length = 150)
+
+datos_predicciones <- expand.grid(bpm = datos_bpm,
+                                  vertical_density = datos_dve)
+
+predicciones <- predict(object = modelo51, newdata = datos_predicciones)
+
+datos_finales3 <- datos_predicciones %>% 
+  mutate(predichos = predicciones)
+
+datos_finales3 %>% 
+  group_by(bpm) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = bpm, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+
+#### Densidad vertical
+
+```{r}
+datos_finales3 %>% 
+  group_by(vertical_density) %>% 
+  summarise(promedio = mean(predichos),
+            de = sd(predichos)) %>% 
+  ungroup() %>% 
+  ggplot(aes(x = vertical_density, y = promedio,
+             ymin = promedio - de,
+             ymax = promedio  + de)) +
+  geom_ribbon(fill = "dodgerblue3", alpha = 0.6) +
+  geom_line(color = "dodgerblue3", size = 1.5)
+```
+
+#### Superficie
+
+```{r}
+datos_finales3 %>% 
+  ggplot(aes(x = bpm, y = vertical_density, fill = predichos)) +
+  geom_tile() +
+  scale_fill_viridis_c()
+```
+
+#### Perspectiva
+
+```{r}
+vis.gam(modelo51, plot.type = "persp", theta = 120)
+```
+
+#### Contorno
+
+```{r}
+vis.gam(modelo51, plot.type = "contour")
+```

@@ -1,0 +1,332 @@
+---
+title: "Árboles de decisión"
+subtitle: "Paper 2"
+author: "Juliana Zapata"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    code_folding: hide
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center",
+                      fig.width = 9)
+```
+
+# Bibliotecas
+
+```{r}
+library(tidyverse) # manejo y visualización de datos
+library(janitor) # edición de nombres
+library(readxl) # lectura de datos en excel
+library(FactoMineR) # análisis multivariado
+library(factoextra) # funciones extras para análisis multivariado
+library(explor) # app shiny para ver resultados análisis multivariado
+library(DT) # Imprimir tablas interactivas
+library(corrplot) # correlograma
+library(splines) # Agregar no linealidad a dispersiones
+library(mgcv) # Modelos GAM
+library(dplyr)
+library(tidyr)
+library(gridExtra)
+library(gplots)
+library(RColorBrewer)
+library(viridis)
+library(clustertend)
+library(grid)
+library(cluster)
+library(mclust)
+
+# Personalizano tema de ggplot2
+theme_set(theme_minimal())
+```
+
+# Datos
+
+```{r}
+datos <- read_excel("~/Desktop/Github/Prototipo/paper 2/14 Febrero 2020 English2.xlsx") %>% 
+  clean_names() %>% 
+  select(-c(replicate, frustrated, distressed, apathetic,
+            tonalidad, ataques, sistema, intervalos,
+            nivel_de_disonancia_vertical, melodia,
+            niveldecontrapunto, compas, ritmo, fraseo_articulaciones,
+            ataques_en_melodia, intensidad, timbre))
+datos
+```
+
+# Análisis de componentes principales
+
+## Ajuste
+
+```{r}
+acp <- PCA(X = datos %>% select(active:happy), scale.unit = TRUE,
+           ncp = 3, graph = FALSE)
+```
+
+## Retención de variabilidad
+
+```{r}
+acp$eig %>%
+  as.data.frame() %>%
+  rownames_to_column(var = "componente") %>%
+  mutate(across(where(is.numeric), round, digits = 2)) %>% 
+  datatable(rownames = FALSE,
+            extensions = 'Buttons',
+            options = list(dom = 'Bfrtip',
+                           buttons = c('excel')))
+```
+
+## Correlaciones {.tabset .tabset-fade .tabset-pills}
+
+### Tabla
+
+```{r}
+acp$var$coord %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "adjetivo") %>%
+  mutate(across(where(is.numeric), round, digits = 2)) %>% 
+  datatable(rownames = FALSE,
+            extensions = 'Buttons',
+            options = list(dom = 'Bfrtip',
+                           buttons = c('excel')))
+```
+
+### Gráfico
+
+```{r}
+acp$var$coord %>% 
+  as.data.frame() %>% 
+  rownames_to_column(var = "adjetivo") %>% 
+  pivot_longer(cols = -adjetivo) %>% 
+  mutate(signo = ifelse(value > 0, "Positivo", "Negativo")) %>% 
+  ggplot(aes(x = adjetivo, y = value, color = signo, fill = signo)) +
+  facet_wrap(~name, scales = "free") +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  labs(y = "Correlación", x = "")
+```
+
+## Índices
+
+- **Nota:** vamos a exportar los datos con los índices obtenidos del análisis de componentes principales.
+
+```{r}
+#writexl::write_xlsx(df_indices, path = "datos_indices_acp_paper2.xlsx")
+df_indices <- datos %>%
+  mutate(comp1 = acp$ind$coord[, 1],
+         comp2 = acp$ind$coord[, 2],
+         comp3 = acp$ind$coord[, 3])
+df_indices
+```
+
+# Parámetros acústicos vs Índices {.tabset .tabset-fade .tabset-pills}
+
+## Índice positivo 
+
+```{r, fig.height=6.5}
+df_indices %>% 
+  select(comp1, centroid:instrumentation) %>% 
+  pivot_longer(cols = -c(comp1),
+               names_to = "parametros", values_to = "valores_acusticos") %>% 
+  ggplot(aes(x = valores_acusticos, y = comp1)) +
+  facet_wrap(~parametros, scales = "free", ncol = 4) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3)) +
+  labs(caption = "Línea roja: modelo lineal \n
+       Línea azul: cuadrático \n
+       Línea amarilla: cúbico")
+```
+
+## Índice negativo
+
+```{r, fig.height=6.5}
+df_indices %>% 
+  select(comp2, centroid:instrumentation) %>% 
+  pivot_longer(cols = -c(comp2),
+               names_to = "parametros", values_to = "valores_acusticos") %>% 
+  ggplot(aes(x = valores_acusticos, y = comp2)) +
+  facet_wrap(~parametros, scales = "free", ncol = 4) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3)) +
+  labs(caption = "Línea roja: modelo lineal \n
+       Línea azul: cuadrático \n
+       Línea amarilla: cúbico")
+```
+
+## Índice neutro
+
+```{r, fig.height=6.5}
+df_indices %>% 
+  select(comp3, centroid:instrumentation) %>% 
+  pivot_longer(cols = -c(comp3),
+               names_to = "parametros", values_to = "valores_acusticos") %>% 
+  ggplot(aes(x = valores_acusticos, y = comp3)) +
+  facet_wrap(~parametros, scales = "free", ncol = 4) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  geom_smooth(method = "gam", se = FALSE, color = "blue",
+              formula = y ~ ns(x, df = 2)) +
+  geom_smooth(method = "gam", se = FALSE, color = "yellow3",
+              formula = y ~ ns(x, df = 3)) +
+  labs(caption = "Línea roja: modelo lineal \n
+       Línea azul: cuadrático \n
+       Línea amarilla: cúbico")
+```
+
+
+# Distribuciones índices {.tabset .tabset-fade .tabset-pills}
+
+## Densidades
+
+```{r}
+df_indices %>%
+
+  select(comp1:comp3) %>% 
+  pivot_longer(cols = everything()) %>% 
+  ggplot(aes(x = value)) +
+  facet_wrap(~name, scales = "free") +
+  geom_density()
+```
+
+#Árbol de decisión
+
+```{r, fig.height=8, width=1}
+library(rpart)
+library(rpart.plot)
+mytitanic <- df_indices   %>%
+
+select(c(centroid:instrumentation, comp1:comp3))%>%
+  rename(
+    "ZCR" = "zcr",
+    "Dissonance" = "dissonance",
+    "Spectral deviation" = "spectral_deviation",
+    "BPM" = "bpm",
+    "Centroid" = "centroid",
+    "Amplitude" = "amplitude",
+    "HFC" = "hfc",
+    "Instrumentation" = "instrumentation"
+  ) 
+
+```
+
+##Ejemplo Indice positivo
+
+```{r, fig.height=8, width=5}
+library(rpart)
+library(rpart.plot)
+mytitanic 
+
+arbol1 <- rpart(formula = comp1 ~ Amplitude + Centroid + HFC + Dissonance + ZCR +
+                  Instrumentation + `Spectral deviation` + BPM,
+                  data = mytitanic) 
+
+g8 <-rpart.plot(arbol1, type = 5,
+           box.palette = "RdGn")
+# Exportando gráfico tiff
+dev.copy(tiff, 'graphics_paper2/arbol1.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+dev.off()
+
+g8
+```
+
+##Ejemplo Comp 2
+```{r, fig.height=8, width=5}
+arbol2 <- rpart(formula = comp2 ~ Amplitude + Centroid + HFC + Dissonance + ZCR +
+                  Instrumentation + `Spectral deviation` + BPM,
+                  data = mytitanic)
+g7 <- rpart.plot(arbol2, type = 5,
+           box.palette = "RdGn")
+
+# Exportando gráfico tiff
+dev.copy(tiff, 'graphics_paper2/arbol2.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+dev.off()
+
+g7
+```
+
+##Ejemplo Componente 3
+
+```{r, fig.height=8, width=5}
+arbol3 <- rpart(formula = comp3 ~ Amplitude + Centroid + HFC + Dissonance + ZCR +
+                  Instrumentation + `Spectral deviation` + BPM,
+                  data = mytitanic)
+g6 <- rpart.plot(arbol3, type = 5,
+           box.palette = "RdGn" )
+
+# Exportando gráfico tiff
+dev.copy(tiff, 'graphics_paper2/arbol3.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+dev.off()
+
+g6
+```
+# Los gráficos que van en el artículo
+
+```{r, fig.width=8, fig.height=3.2}
+par(mfrow = c(1, 3))
+# Plot 1
+arbol1 <- rpart(formula = comp1 ~ Amplitude + Centroid + HFC + Dissonance + ZCR +
+                  Instrumentation + `Spectral deviation` + BPM,
+                  data = mytitanic) 
+
+g8 <-rpart.plot(arbol1, main="A. Positive high arousal index",
+                type = 5,
+           box.palette = "PuBu")
+
+
+# Plot 2
+
+arbol2 <- rpart(formula = comp2 ~ Amplitude + Centroid + HFC + Dissonance + ZCR +
+                  Instrumentation + `Spectral deviation` + BPM,
+                  data = mytitanic)
+g7 <- rpart.plot(arbol2, main="B. Negative high arousal index",
+                 type = 5,
+           box.palette = "PuBu")
+
+# Plot 3
+
+arbol3 <- rpart(formula = comp3 ~ Amplitude + Centroid + HFC + Dissonance + ZCR +
+                  Instrumentation + `Spectral deviation` + BPM,
+                  data = mytitanic)
+g6 <- rpart.plot(arbol3, main="C. Positive low arousal index",
+                 type = 5,
+           box.palette = "PuBu" )
+
+# Exportando gráfico pdf
+dev.copy(tiff, 'graphics_paper2/todoslosárboles.tiff',
+        res=600,
+        height=8.5,
+        width=11,
+        units="in")
+
+
+dev.off()
+
+```

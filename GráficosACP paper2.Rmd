@@ -1,0 +1,220 @@
+---
+title: "Octubre 4 de 2021 English"
+author: "Juliana Zapata"
+date: "03/10/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                      warning = FALSE,
+                      message = FALSE,
+                      fig.align = "center")
+```
+
+# Lectura de datos
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+library(jcolors)
+library(DT)
+library(plotly)
+library(ggpubr)
+library(broom)
+datos <- read_xlsx("~/Desktop/Github/Prototipo/paper 2/14 Febrero 2020 English2.xlsx") %>% 
+  select(-c(Tonalidad:`Niveldecontrapunto`, Compás:Intensidad, Timbre))
+datos
+```
+
+# Descriptivo
+
+```{r}
+library(DT)
+datos %>% 
+  select_if(is.numeric) %>% 
+  select(-Replicate) %>% 
+  gather(key = "variable", value = "valor") %>% 
+  group_by(variable)  %>%
+  summarise(Mínimo = round(min(valor, na.rm = TRUE), digits = 2),
+            Media  = round(mean(valor, na.rm = TRUE), digits = 2),
+            Máximo = round(max(valor, na.rm = TRUE), digits = 2),
+            DE     = round(sd(valor, na.rm = TRUE), digits = 2),
+            Q1     = round(quantile(valor, probs = 0.25, na.rm = TRUE), digits = 2),
+            Q2     = round(quantile(valor, probs = 0.50, na.rm = TRUE), digits = 2),
+            Q3     = round(quantile(valor, probs = 0.75, na.rm = TRUE), digits = 2),
+            n = n()) %>% 
+  ungroup() %>% 
+  datatable(extensions = 'Buttons', options = list(
+     dom = 'Bfrtip',
+     buttons = c('csv', 'excel', 'pdf')))
+```
+
+# Análisis de Componentes Principales (ACP) {.tabset .tabset-fade .tabset-pills}
+
+
+```{r} 
+library(FactoMineR)
+datos_acp1 <- datos %>% 
+  select(Active:Distressed)
+
+acp1 <- PCA(X = datos_acp1, scale.unit = TRUE,  graph = FALSE, ncp = 7)
+summary(acp1)
+```
+
+
+
+## Variabilidad
+
+```{r}
+library(factoextra)
+fviz_screeplot(acp1, ncp = 7)
+```
+
+## Importancia variables
+
+```{r, fig.width=9, fig.height=4}
+library(ggpubr)
+ggarrange(
+  fviz_contrib(X = acp1, axes = 1, choice = "var") + coord_flip() ,
+  fviz_contrib(X = acp1, axes = 2, choice = "var") + coord_flip() ,
+  fviz_contrib(X = acp1, axes = 3, choice = "var") + coord_flip() ,
+  ncol = 3
+)
+```
+
+## Componente 1 vs Componente 2
+
+```{r, fig.width=9}
+library(plotly)
+plotly::ggplotly(
+  fviz_pca_biplot(X = acp1, axes = c(1, 2), label = "var") +
+  geom_text(label = datos$`Musical Piece`, size = 3, nudge_y = 0.1),repel = TRUE )
+```
+
+```{r, fig.width=10, fig.height=5}
+g1 <- 
+  ggarrange(
+fviz_pca_var(acp1, axes = c(1, 2),  
+               select.var = list(contrib = 17), graph=FALSE,
+               geom = c("arrow", "text"), col.var = "black", labelsize=4,
+               fill.var = "grey", alpha.var = 0, col.quanti.sup = "blue",
+               repel = TRUE) +
+        theme(panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank()) +
+        labs(x = "PC1(43.8%)", y = "PC2(16.4%)",
+        title = "A", color = ""),
+
+  fviz_pca_var(acp1, axes = c(1, 3),  
+               select.var = list(contrib = 17), graph=FALSE,
+               geom = c("arrow", "text"), col.var = "black", labelsize=4,
+               fill.var = "grey", alpha.var = 0, col.quanti.sup = "blue",
+               repel = TRUE) +
+        theme(panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank()) +
+        labs(x = "PC1(43.8%)", y = "PC3(8.7%)",
+        title = "B", color = ""),
+    ncol = 2)
+
+# Exportando gráfico pdf
+ggsave(filename = "graphics_paper2/ACPpaper2.pdf", 
+       plot = g1,
+       device = "pdf",
+       dpi = 96,
+       units = "cm",
+       width = 35.14, # igual a 531px
+       height = 14.05) # igual a 1328px
+
+# Exportando gráfico Tiff
+ggsave(filename = "graphics_paper2/ACPpaper2.tiff", 
+       plot = g1,
+       device = "tiff",
+       dpi = 96,
+       units = "cm",
+       width = 35.14, # igual a 531px
+       height = 14.05) # igual a 1328px
+g1
+
+```
+
+```{r, fig.width=10, fig.height=5}
+g2 <-ggarrange(
+fviz_pca_var(acp1, axes = c(1, 2),  
+               select.var = list(contrib = NULL), graph=FALSE,
+               geom = c("arrow", "text"), col.var = "black", labelsize=4,
+               fill.var = "grey", alpha.var = 0, col.quanti.sup = "blue",
+               repel = TRUE) +
+        theme(panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank()) +
+        labs(x = "PC1(43.8%)", y = "PC2(16.4%)",
+        title = "A", color = ""),
+
+fviz_pca_ind(acp1, axes = c(1, 2),
+             select.var = list(contrib = 11), graph=FALSE,
+               geom = c("point", "text"), col.var = "black", labelsize=4,
+               fill.var = "grey", alpha.var = 0, col.quanti.sup = "blue",
+               repel = TRUE) +
+        theme(panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        plot.background=element_blank()) +
+        labs(x = "PC1(43.8%)", y = "PC2(16.4%)",
+        title = "B", color = ""),
+    ncol = 2)
+
+# Exportando gráfico pdf
+ggsave(filename = "graphics_paper2/ACP2paper2.pdf", 
+       plot = g2,
+       device = "pdf",
+       dpi = 96,
+       units = "cm",
+       width = 35.14, # igual a 531px
+       height = 14.05) # igual a 1328px
+
+# Exportando gráfico Tiff
+ggsave(filename = "graphics_paper2/ACP2paper2.tiff", 
+       plot = g2,
+       device = "tiff",
+       dpi = 96,
+       units = "cm",
+       width = 35.14, # igual a 531px
+       height = 14.05) # igual a 1328px
+g2
+```
+
+
+
+
+## Componente 1 vs Componente 3
+
+```{r, fig.height=8, width=10}
+fviz_pca_var(X = acp1, axes = c(1, 3), geom = c("arrow", "text"), repel = TRUE, col.var = "black",
+  fill.var = "white", alpha.var = 0, col.quanti.sup = "blue",
+  col.circle = "grey70", select.var = list(name = NULL, cos2 = NULL,
+  contrib = NULL))
+
+```
+
+## Componente 2 vs Componente 3
+
+```{r, fig.height=8, width=10}
+fviz_pca_var(X = acp1, axes = c(2, 3), geom = c("arrow", "text"), repel = TRUE, col.var = "black",
+  fill.var = "white", alpha.var = 0, col.quanti.sup = "blue",
+  col.circle = "grey70", select.var = list(name = NULL, cos2 = NULL,
+  contrib = NULL))
+
+```
+
+
