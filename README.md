@@ -1,8 +1,9 @@
-Nature-Scientific-Reports
+# Nature-Scientific-Reports
 This is the completed version of codes for paper: Spectro-temporal acoustic elements of music interact in an integrated way in the modulation of emotions in pigs, by Juliana Zapata Cardona; Maria Camila Ceballos; Ariel Marcel Tarazona Morales; Edimer David Jaramillo; Berardo de Jesús Rodríguez.
 
-Abstract
+# Abstract
 Music is a complex stimulus, with different spectro-temporal acoustic elements, which are perceived holistically, determining one of the most important attributes of music, elicit emotions. In non-human animals the effect of musical acoustic elements in emotions from an integrated approach has not been studied; This knowledge is important for the design of species-specific stimuli, which can be used for environmental enrichment. Thirty-nine instrumental musical pieces were composed and used to analyze the effect of several of its acoustic parameters on emotional responses in farm pigs through musical computer analysis. Video recordings of pigs in the nursery phase (n=50) were gathered and the emotional responses induced by the stimuli were evaluated using the Qualitative Behavioral Assessment (QBA). Non-parametric Statistical models (GAM, decision trees) were applied and compared to evaluate the relationship between acoustic parameters and the emotional responses observed in animals. We concluded that musical structure had an effect on the emotional responses of the pigs. The valence of the emotions induced depends on the interaction integrated and simultaneous of spectral and temporal components that can be modulated in the composition of the music. This knowledge will allow the design of musical stimuli, that can be incorporated into environmental enrichment protocols in non-human animals.
 
-Contact
+# Contact
 Please send email to juliana.zapata9@udea.edu.co should you have any questions, comments or suggestions.
+
